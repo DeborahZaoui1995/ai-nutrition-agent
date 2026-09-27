@@ -154,6 +154,7 @@ export default function SnackCoach() {
   const [agentErrorMessage, setAgentErrorMessage] = useState<string | null>(null);
   const [agentSubPhase, setAgentSubPhase] = useState<AgentSubPhase>("sending");
   const [showingDecision, setShowingDecision] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const agentRequestIdRef = useRef(0);
   const sendingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -536,6 +537,27 @@ export default function SnackCoach() {
       </header>
 
       <div className="flex-1 pb-8">
+        {/* Help — compact, collapsed by default */}
+        <div className="mx-4 mt-4 rounded-2xl bg-white shadow">
+          <button
+            onClick={() => setShowHelp((prev) => !prev)}
+            aria-expanded={showHelp}
+            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-700"
+          >
+            <span>❓ How to Play</span>
+            <span className={`transition-transform ${showHelp ? "rotate-180" : ""}`}>⌄</span>
+          </button>
+          {showHelp && (
+            <ol className="flex flex-col gap-1.5 px-4 pb-4 text-sm text-slate-600">
+              <li>1. Allow camera access.</li>
+              <li>2. Show the requested object.</li>
+              <li>3. Hold it steady.</li>
+              <li>4. Wait for the AI Agent.</li>
+              <li>5. Complete as many challenges as possible.</li>
+            </ol>
+          )}
+        </div>
+
         {/* App status — single, clear answer to "what is happening right now" */}
         <div
           className={`mx-4 mt-4 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${phaseMeta.className}`}
