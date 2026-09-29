@@ -20,7 +20,7 @@ Camera + Teachable Machine model    --->   /api/model   (serves model URLs)
         └──────────────── AgentRequest ────────────>│
                                                      ▼
                                             Google Gemini API
-                                            (gemini-3.8-flash,
+                                            (gemini-3.6-flash + fallbacks,
                                              structured JSON output)
         <──────────────── AgentResult ───────────────┘
 ```

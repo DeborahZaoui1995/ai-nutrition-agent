@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getGeminiClient, GEMINI_MODEL } from "@/lib/gemini";
+import { getGeminiClient, GEMINI_MODELS } from "@/lib/gemini";
 import {
   AgentRequest,
   AgentResult,
@@ -154,37 +154,49 @@ export function buildRescanFallback(input: AgentRequest): AgentResult {
   };
 }
 
+const ATTEMPT_TIMEOUT_MS = 6_000;
+
 export async function runAgent(input: AgentRequest): Promise<AgentResult> {
   const ai = getGeminiClient();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
 
   let responseText: string | undefined;
-  try {
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [{ role: "user", parts: [{ text: JSON.stringify(input) }] }],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseJsonSchema: RESPONSE_JSON_SCHEMA,
-        temperature: 0.8,
-        maxOutputTokens: 512,
-        // This is a quick structured game-logic decision, not a reasoning
-        // task — disable thinking so the token budget goes to the JSON
-        // answer instead of a thought trace (which was starving the
-        // response and producing empty/truncated output).
-        thinkingConfig: { thinkingBudget: 0 },
-        abortSignal: controller.signal,
-      },
-    });
-    responseText = response.text;
-  } catch (err) {
-    throw new GeminiUnavailableError(
-      err instanceof Error ? err.message : "Gemini request failed"
-    );
-  } finally {
-    clearTimeout(timeout);
+  let lastError = "Gemini request failed";
+  let succeeded = false;
+
+  for (const model of GEMINI_MODELS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: JSON.stringify(input) }] }],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseJsonSchema: RESPONSE_JSON_SCHEMA,
+          temperature: 0.8,
+          maxOutputTokens: 512,
+          // This is a quick structured game-logic decision, not a reasoning
+          // task — disable thinking so the token budget goes to the JSON
+          // answer instead of a thought trace (which was starving the
+          // response and producing empty/truncated output).
+          thinkingConfig: { thinkingBudget: 0 },
+          abortSignal: controller.signal,
+        },
+      });
+      responseText = response.text;
+      succeeded = true;
+      break;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : lastError;
+      console.warn(`[agent] ${model} failed, trying next model:`, lastError);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  if (!succeeded) {
+    throw new GeminiUnavailableError(lastError);
   }
 
   if (!responseText) {
